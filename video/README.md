@@ -5,7 +5,7 @@
 - **再生**：ブラウザ（Chrome / Win・Mac、Android も再生のみ可）。エンコード不要。
 - **書き出し**：ブラウザでテレメトリ動画を書き出し → ローカル ffmpeg 1コマンドで合成。
 
-同期の根拠・機器特性は `embedded/knowledge/dashcam-obd-time-sync.md`（プライベート）に記録。
+同期の根拠・機器特性は `vehicle-knowledge/dashcam-obd-time-sync.md`（プライベート）に記録。
 
 ## 構成
 
