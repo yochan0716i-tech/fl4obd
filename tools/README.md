@@ -1,4 +1,6 @@
-# flow.js の検証
+# 検証ツール
+
+## flow.js の描画
 
 `lib/flow.js` を DOM のシムの上で動かして、描画結果を機械的に検査する。ブラウザは要らない。
 
@@ -33,3 +35,23 @@ node tools/flow-direction.mjs                                     # 矢印の向
   組の集合を縦長と横長で突き合わせる。重なりの検査は向きを見ないので別に要る。
 - 状態は EV力行 / EV回生 / SERIES / DIRECT / TRANS60 / TRANS60逆 の6通り。
   **回生と genMot（GEN がエンジンを回す側）は向きが反転する枝があるので必ず含める。**
+
+## 2920 デコードの一致
+
+`lib/did2920.js` が DID 22 29 20 の byte offset と係数の唯一の定義元。使う側は4つある。
+
+| 使う側 | 入口 | 入力 |
+|---|---|---|
+| `index.html` | `parse22_2920` | BLE 実時間（hex 文字列） |
+| `replay.html` | `parseFrames` | ログ再生（hex 文字列） |
+| `viewer.html` | `compute2920` | ログビュワー（hex 文字列） |
+| `video/sync.js` | `parseObdLog` | 動画同期・CLI（バイト配列） |
+
+```bash
+node tools/did2920-parity.mjs <走行ログ.txt>   # 4実装が同じ値を出すこと
+```
+
+実ログの全 2920 フレームで `vsp/rpm/mode/pbat/peng/pgen/pdrive/psys/v12` を突き合わせ、
+食い違えば終了コード 1。**共通化する前は pgen の係数だけ 0.13% ずれていた**
+（`index`・`viewer` は導出式 `0.02/0.535 × 2π/60 / 1000`、`replay`・`sync` は
+丸めた `3.92e-6`）。値がずれても画面は出るので、目視では気づけない。

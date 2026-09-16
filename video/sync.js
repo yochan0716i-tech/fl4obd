@@ -11,6 +11,10 @@
  *  - 推定値には必ず残差と妥当性フラグを付け、解けない場合は黙って通さない。
  */
 
+import { CAL, decode2920, powers, MIN_BYTES } from '../lib/did2920.js';
+
+export { CAL };   // 従来どおり sync.js からも取れるようにしておく
+
 const MP4_EPOCH_OFFSET = 2082844800; // 1904-01-01 → 1970-01-01 [s]
 
 export const DEFAULT_PROFILE = {
@@ -279,22 +283,11 @@ export function parseObdLog(text, { timeMode = 'ok' } = {}) {
       if (W[0] === 0x62) {
         const did = u16(W, 1);
         dids.add(did);
-        if (did === 0x2920 && W.length >= 104) {
+        if (did === 0x2920 && W.length >= MIN_BYTES) {
           // W[98]==0xF8 は 2920 の固定バイト。あれば健全性チェックとして使う。
           if (W.length > 98 && W[98] !== 0xf8) { nBad++; continue; }
-          samples.push({
-            t: ts,
-            vsp: W[15],
-            rpm: u16(W, 100) / 4,
-            mode: W[79],
-            coolant: W[102] - 40,
-            pbat: s16(W, 86) * 0.01,
-            accel: apsPedal(W[19]),     // logger byte17 = APS1 → webapp W[19]
-            v12: W[16] * 0.1,
-            drv: s16(W, 90),            // 駆動トルク(raw)
-            gen: s16(W, 92),            // 発電機トルク(raw)
-            eng: s16(W, 96),            // エンジントルク(raw)
-          });
+          const f = decode2920(W);      // フィールド定義は lib/did2920.js に一本化
+          if (f) samples.push({ t: ts, ...f });
         }
       }
       continue;
@@ -316,17 +309,6 @@ export function parseObdLog(text, { timeMode = 'ok' } = {}) {
 
 // ---------------------------------------------------------------- 派生量（パワーフロー用）
 
-/*
- * 較正定数。replay.html / index.html と同一の値を使う。
- * 由来は embedded/knowledge/fl4-did-map.md（トルクスケール・coef 群）と
- * fl4obd/docs/soc-interpolation.md（SOC_K）。値を変えるときは両方を揃えること。
- */
-export const CAL = {
-  COEF_ENG: 2.09e-6,   // P_eng[kW] = COEF_ENG × eng_trq(raw) × rpm
-  COEF_GEN: 3.92e-6,   // P_gen[kW] = COEF_GEN × (-gen_trq(raw)) × rpm
-  COEF_TRC: 0.000147,  // P_drive[kW] = COEF_TRC × drv_trq(raw) × 車速
-  SOC_K: -192,         // ΔSOC[%] = SOC_K × ∫Pbat[kWh]（短窓の実測係数）
-};
 
 /** 遷移モード(10/30/60)を「次の安定モード＝行先」へ寄せて modeR を付ける。 */
 export function resolveModes(samples) {
@@ -346,35 +328,13 @@ export function resolveModes(samples) {
  * 生の 2920 サンプルからパワーフロー描画に必要な派生量を計算する。
  * SOC は実測 5B が来たら再アンカーし、その間を ∫Pbat で前進させる（表示専用）。
  */
-/*
- * APS1（アクセルペダルセンサ）を踏み込み率[%]に直す。
- *
- * 生値は PID49 と同じ `A×100/255` で、これは**センサの電圧比であってペダル
- * 踏み込み率ではない**。APS は断線検出のため下端に余裕を持たせてあり、
- * 足を完全に離しても 0 にならない。
- *
- * 実測（走行ログ 22 本）: 床 19.22–19.61 %（49–50 LSB、1 LSB 以内で安定）、
- * 全開 94.9–95.3 %（242–243 LSB）。この 2 点で正規化する。
- *
- * これをやらないと「足を離しているのにアクセル 20%」と表示される。
- */
-const APS_FLOOR = 19.4, APS_FULL = 95.1;
-function apsPedal(raw) {
-  const pct = (raw * 100) / 255;
-  return Math.max(0, Math.min(100, ((pct - APS_FLOOR) / (APS_FULL - APS_FLOOR)) * 100));
-}
-
 export function deriveTelemetry(obd) {
   const socAnchors = obd.soc || [];
   let ai = 0, socR = NaN, prevT = null;
   resolveModes(obd.samples);
   for (const s of obd.samples) {
     while (ai < socAnchors.length && socAnchors[ai].t <= s.t) { socR = socAnchors[ai].v; ai++; } // 実測5Bで再アンカー
-    const isDir = s.mode === 50 || s.mode === 70;
-    s.peng = CAL.COEF_ENG * s.eng * s.rpm;
-    s.pgen = CAL.COEF_GEN * -s.gen * s.rpm;
-    s.pdrive = CAL.COEF_TRC * s.drv * s.vsp;
-    s.psys = s.pdrive + (isDir ? s.peng : 0);
+    Object.assign(s, powers(s));   // peng / pgen / pdrive / psys
     if (!isNaN(socR) && prevT != null) {
       const dt = (s.t - prevT) / 3600; // s → h
       if (dt > 0 && dt < 0.02) socR += CAL.SOC_K * s.pbat * dt;

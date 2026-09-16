@@ -112,12 +112,9 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="lib/flow.js"></script>
-<script>
+<script type="module">
+import { CAL, decode2920, powers } from './lib/did2920.js';
 // ═══ パース ═══════════════════════════════════════════════
-const s16=(h,i)=>{const v=parseInt(h.substr(i*2,4),16);return v>=0x8000?v-0x10000:v;};
-const u16=(h,i)=>parseInt(h.substr(i*2,4),16);
-const u8 =(h,i)=>parseInt(h.substr(i*2,2),16);
-
 function reassemble(line){
   const seg={};
   for(const tok of line.trim().split(/\s+/)){
@@ -145,7 +142,7 @@ function parseFrames(text){
   const out=[]; let prevTod=-1, dayOff=0, lastSoc=NaN;
   // SOC復元: 実測5Bが来たら再アンカー、その間は 2920 の ∫Pbat で前進させる(較正 -154%/kWh = 6.5Wh/%)。
   // これで SOC が 5B の疎いポーリング(3秒毎)でなく 2920 の更新に同期して滑らかに動く。
-  const SOC_K=-192; let socR=NaN, prevT=null;   // 短窓の実測係数(2923真値で最適化。net容量係数154でなく)
+  let socR=NaN, prevT=null;
   for(const line of lines){
     const sm=/\b415B([0-9A-Fa-f]{2})/i.exec(line);   // SOC (01_5B): 100*A/255
     if(sm){ const a=parseInt(sm[1],16); if(!isNaN(a)){ lastSoc=+(100*a/255).toFixed(1); socR=lastSoc; } }  // 実測5Bで再アンカー
@@ -155,15 +152,13 @@ function parseFrames(text){
     let t=0;
     if(tm){ const tod=(+tm[1])*3600000+(+tm[2])*60000+(+tm[3])*1000+(+tm[4]);
       if(prevTod>=0 && tod<prevTod-1000) dayOff+=86400000; prevTod=tod; t=dayMs+tod+dayOff; }
-    const mode=u8(hex,79), rpm=u16(hex,100)/4, vsp=u8(hex,15);
-    const drv=s16(hex,90), gen=s16(hex,92), eng=s16(hex,96), pbat=s16(hex,86)*0.01;
-    const v12=u8(hex,16)*0.1;   // 12V系電圧(2920 byte14=bit112, ×0.1V/LSB。PID42と等価・高レート)
-    const peng=2.09e-6*eng*rpm, pgen=3.92e-6*(-gen)*rpm, pdrive=0.000147*drv*vsp;
-    const isDir=(mode===50||mode===70);
+    const f=decode2920(hex); if(!f) continue;          // フィールド定義は lib/did2920.js
+    const {mode,rpm,vsp,pbat,v12}=f;
+    const {peng,pgen,pdrive,psys}=powers(f);
     // ∫Pbat で socR を前進(前フレームからの経過で積分, 異常gapは無視)
-    if(!isNaN(socR) && prevT!=null){ const dt=(t-prevT)/3600000; if(dt>0&&dt<0.02) socR+=SOC_K*pbat*dt; }
+    if(!isNaN(socR) && prevT!=null){ const dt=(t-prevT)/3600000; if(dt>0&&dt<0.02) socR+=CAL.SOC_K*pbat*dt; }
     prevT=t;
-    out.push({t,mode,rpm,vsp,peng,pgen,pdrive,pbat,v12,soc:isNaN(socR)?lastSoc:+socR.toFixed(2),psys:pdrive+(isDir?peng:0)});
+    out.push({t,mode,rpm,vsp,peng,pgen,pdrive,pbat,v12,soc:isNaN(socR)?lastSoc:+socR.toFixed(2),psys});
   }
   out.sort((a,b)=>a.t-b.t); return out;
 }

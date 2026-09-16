@@ -233,14 +233,13 @@
   </div>
 </div>
 
-<script>
+<script type="module">
+import { decode2920, powers } from './lib/did2920.js';
 const charts = {};
 
 /* ══ フロー再生（index.html のフロー図を移植）════════════════════ */
 const D = {};
 const MODE_LABELS = { 20:'EV', 40:'SERIES', 50:'DIRECT', 70:'DIRECT', 60:'TRANS', 30:'TRANS', 10:'TRANS' };
-const GEN_TRQ_NM = 0.02 / 0.535;
-const GEN_PWR_COEF = GEN_TRQ_NM * (2*Math.PI/60) / 1000;
 const FNS = 'http://www.w3.org/2000/svg';
 function fEl(tag,attrs,parent){const e=document.createElementNS(FNS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(parent)parent.appendChild(e);return e;}
 const FX_M='#ff9a44', FX_E='#00e5ff', FX_R='#25e0a0', FX_A='#c9a0ff';
@@ -342,21 +341,13 @@ function reassemble2920(rxRaw){
   let full=''; for(let i=0;i<=15;i++) if(frames[i]!==undefined) full+=frames[i];
   return full;
 }
+/* フィールド定義と係数は lib/did2920.js。ここは従来の戻り値の形へ合わせるだけ。 */
 function compute2920(full){
-  if(full.length < 204) return null;
-  const u16=i=>parseInt(full.substr(i*2,4),16);
-  const s16=i=>{const v=u16(i);return v>=0x8000?v-0x10000:v;};
-  const u8 =i=>parseInt(full.substr(i*2,2),16);
-  const vsp=u8(15), engRpm=u16(100)/4, mode=u8(79);
-  const engTrq=s16(96), drvTrq=s16(90), genTrq=s16(92);
-  return {
-    vsp, engRpm, mode,
-    pbat:   s16(86)*0.0100,
-    peng:   2.09e-6 * engTrq * engRpm,
-    pgen:   GEN_PWR_COEF * (-genTrq) * engRpm,
-    pdrive: 0.000147 * drvTrq * vsp,
-    v12:    u8(16) * 0.1,   // 12V系電圧(2920 byte14=bit112, ×0.1V/LSB, PID42と等価・高レート)
-  };
+  const f = decode2920(full);
+  if(!f) return null;
+  const p = powers(f);
+  return { vsp:f.vsp, engRpm:f.rpm, mode:f.mode, pbat:f.pbat,
+           peng:p.peng, pgen:p.pgen, pdrive:p.pdrive, v12:f.v12 };
 }
 
 /* ── 再生コントローラ ─────────────────────────────────────── */

@@ -159,8 +159,8 @@ body.compact .vtab { padding:5px 6px; }
 
 <!-- VIEW TABS: フロー(既定) / ゲージ -->
 <div class="vtabs">
-  <button id="tabFlow"  class="vtab active" onclick="setView('flow')">⇄ FLOW</button>
-  <button id="tabGauge" class="vtab" onclick="setView('gauge')">◧ GAUGE</button>
+  <button id="tabFlow"  class="vtab active">⇄ FLOW</button>
+  <button id="tabGauge" class="vtab">◧ GAUGE</button>
 </div>
 
 <div id="gaugeView" style="display:none;">
@@ -331,7 +331,7 @@ body.compact .vtab { padding:5px 6px; }
   </div>
 </div>
 
-<button class="conn-btn" id="connBtn" onclick="toggleConnect()">[ BLUETOOTH 接続 ]</button>
+<button class="conn-btn" id="connBtn">[ BLUETOOTH 接続 ]</button>
 
 <div class="log-wrap">
   <div class="log" id="logBox">
@@ -339,11 +339,11 @@ body.compact .vtab { padding:5px 6px; }
   </div>
 </div>
 
-<button class="conn-btn" id="recBtn" onclick="toggleRec()">● REC</button>
+<button class="conn-btn" id="recBtn">● REC</button>
 
 <div class="navbar">
-  <button class="conn-btn" id="gpsBtn" onclick="toggleGps()">[ GPS ]</button>
-  <button class="conn-btn" id="demoBtn" onclick="toggleDemo()">[ DEMO ]</button>
+  <button class="conn-btn" id="gpsBtn">[ GPS ]</button>
+  <button class="conn-btn" id="demoBtn">[ DEMO ]</button>
   <a href="viewer.html" target="_blank" class="conn-btn">[ VIEWER ]</a>
   <a href="replay.html" target="_blank" class="conn-btn">[ REPLAY ]</a>
   <a href="video.html" target="_blank" class="conn-btn">[ VIDEO ]</a>
@@ -351,7 +351,8 @@ body.compact .vtab { padding:5px 6px; }
 </div><!-- /app -->
 
 <script src="lib/flow.js"></script>
-<script>
+<script type="module">
+import { CAL, decode2920, powers } from './lib/did2920.js';
 /*
  * 版。中身を変えたら必ず上げる。日付 + 同日内の連番(a,b,c…)。
  * ここが唯一の出どころで、画面ヘッダ・保存ログの見出し・起動時のログ行に流し込む。
@@ -603,16 +604,8 @@ initCenterMark('centerPsys');
 // fuelShow: 012F を取りにいくのはこのアプリだけなので、枠を出すのもここだけ。
 // リプレイ/動画は D.fuelLvl を持たないため何も描かれない。
 Object.assign(D, { engRot:0, soc:NaN, pbat:0, vsp:0, psys:0, peng:0, runMode:-1, pgen:0, pdrive:0, dispMode:-1, fuelShow:true });
-// off90(bit720) = gen_trq(発電機トルク, 生信号)。2920単独で独立に物理換算する。
-// ENG-GEN同軸ゆえ定常の torque balance 比例部分: eng_trq_Nm ≈ gen_trq_Nm。
-// 走行ログ散布図(eng_trq vs gen_trq)の比例係数 |gen_trq|/eng_trq ≈ 0.535 と
-// eng_trqスケール 0.02Nm/LSB から: gen_trqスケール = 0.02/0.535 ≈ 0.0374 Nm/LSB。
-// ※散布図のx切片(≈300LSB)は機械損失(フリクション)。比例部分のみ換算に使い、切片は除外。
-// P_gen[kW] = gen_trq_Nm * eng_rpm * (2π/60)/1000  (同軸: gen_rpm=eng_rpm)。発電時 gen_trq<0 → 符号反転で正。
-const GEN_TRQ_NM = 0.02 / 0.535;                  // ≈0.0374 Nm/LSB
-const GEN_PWR_COEF = GEN_TRQ_NM * (2*Math.PI/60) / 1000;  // ≈3.92e-6  (|gen_trq|*eng_rpm → kW)
+// 係数と byte offset は lib/did2920.js（唯一の定義元）。
 let systemVolt = 0;
-const SOC_K = -192;        // %/kWh  SOC内挿係数(2923真値で最適化した短窓係数。net容量係数154でなく)
 let socPrevT = 0;          // 前回2920フレーム時刻(内挿の積分起点)
 let runTimeBase = 0;
 let syncTimeMs  = null;
@@ -877,34 +870,22 @@ function decodeService01(bytes) {
 // 再組立て後の応答: 62 29 XX <payload...>  (XX=DID下位)
 // フィールドマップの byte offset N → 応答byte index = N+2
 function parse22_2920(hex) {
-  if (hex.length < 204) return;              // byte100(eng_rpm) まで必要
-  const u16 = i => parseInt(hex.substr(i * 2, 4), 16);
-  const s16 = i => { const v = u16(i); return v >= 0x8000 ? v - 0x10000 : v; };
-  const u8  = i => parseInt(hex.substr(i * 2, 2), 16);
-  const vsp    = u8(15);             // 車速[km/h] = spd_echo (start104,len8)
-  const engRpm = u16(100) / 4;       // eng_rpm  2920(784,16,BE,u) → byte98
-  const pbat   = s16(86)  * 0.0100;  // batt_pwr 2920(672,16,BE,s) → byte84
-  const engTrq = s16(96);            // eng_trq  2920(752,16,BE,s) → byte94
-  const drvTrq = s16(90);            // drv_trq3 2920(704,16,BE,s) → byte88
-  const genTrq = s16(92);            // gen_trq  2920(720,16,BE,s) → byte90 ※torque(発電時<0)
-  const mode   = u8(79);             // mode     2920(616, 8,flag) → byte77 ※値は10進(20/40/50…)
-  D.vsp     = vsp;
-  D.engRot  = engRpm;
+  const f = decode2920(hex);                 // フィールド定義は lib/did2920.js
+  if (!f) return;                            // byte100(eng_rpm) まで必要
+  const pbat = f.pbat;
+  D.vsp     = f.vsp;
+  D.engRot  = f.rpm;
   D.pbat    = pbat;
-  D.runMode = mode;
-  D.rawMode = mode;                                   // フロー図のトポロジは生モードで決める
-  D.dispMode = updateStableMode(mode);                // モード遷移ホールド(10/30/60を吸収)
-  D.peng = 2.09e-6 * engTrq * engRpm;                 // エンジン機械出力 [kW]
-  D.pgen = GEN_PWR_COEF * (-genTrq) * engRpm;         // 発電機出力 [kW] (発電=正, 2920単独)
-  D.pdrive = 0.000147 * drvTrq * vsp;                 // 車輪(TRC)出力 [kW]
-  const isDirect = (mode === 50 || mode === 70);      // 直結のみエンジン分を加算(10進)
-  D.psys = D.pdrive + (isDirect ? D.peng : 0);
-  systemVolt = u8(16) * 0.1;                           // 12V系電圧 = byte14(bit112) ×0.1V/LSB (PID42と等価・高レート)
+  D.runMode = f.mode;
+  D.rawMode = f.mode;                                 // フロー図のトポロジは生モードで決める
+  D.dispMode = updateStableMode(f.mode);              // モード遷移ホールド(10/30/60を吸収)
+  Object.assign(D, powers(f));                        // peng / pgen / pdrive / psys
+  systemVolt = f.v12;                                 // 12V系電圧 = byte14(bit112) ×0.1V/LSB (PID42と等価・高レート)
   // SOC内挿(表示用のみ): 5B(30秒毎)の間を ∫Pbat で前進。5B受信時(case 0x5B)に真値へ再アンカー。
   // ※ログは生の5B/2920フレームのみ(この D.soc は表示専用で記録しない)。
   const _now = Date.now();
   if (!isNaN(D.soc) && socPrevT) { const dt = (_now - socPrevT) / 3600000;
-    if (dt > 0 && dt < 0.02) D.soc = Math.max(0, Math.min(100, D.soc + SOC_K * pbat * dt)); }
+    if (dt > 0 && dt < 0.02) D.soc = Math.max(0, Math.min(100, D.soc + CAL.SOC_K * pbat * dt)); }
   socPrevT = _now;
 }
 
@@ -1617,6 +1598,15 @@ function toggleDemo() {
   if (connected) return; // 接続中はデモ不可
   demoRunning ? stopDemo() : startDemo();
 }
+
+// ─── 操作の割り当て ────────────────────────────────────────
+// module スコープでは HTML の onclick 属性から関数を呼べないのでここで結ぶ。
+document.getElementById('tabFlow').addEventListener('click', () => setView('flow'));
+document.getElementById('tabGauge').addEventListener('click', () => setView('gauge'));
+document.getElementById('connBtn').addEventListener('click', toggleConnect);
+document.getElementById('recBtn').addEventListener('click', toggleRec);
+document.getElementById('gpsBtn').addEventListener('click', toggleGps);
+document.getElementById('demoBtn').addEventListener('click', toggleDemo);
 
 // ─── 画面回転 ──────────────────────────────────────────────
 // 起動時はデモOFF
