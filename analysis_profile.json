@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "profile_id": "battery_limits_v1",
+  "description": "FL4 e:HEV battery thermal / charge-discharge limit exploration profile",
+  "safety": {
+    "read_only": true,
+    "allowed_obd_services": ["01", "22"],
+    "forbidden_operations": [
+      "write_data_by_identifier",
+      "routine_control",
+      "ecu_reset",
+      "dtc_clear",
+      "coding",
+      "actuator_test"
+    ]
+  },
+  "dids": [
+    {
+      "did": "2920",
+      "command": "222920",
+      "status": "known_reference",
+      "enabled": true,
+      "interval_ms": 200,
+      "decoder": "./lib/did2920.js",
+      "known_fields": [
+        "vsp", "v12", "accel", "mode", "pbat", "drv", "gen", "eng", "rpm", "coolant",
+        "peng", "pgen", "pdrive", "psys"
+      ],
+      "investigate": [],
+      "notes": "Use as correlation/reference signal. Preserve raw payload."
+    },
+    {
+      "did": "2902",
+      "command": "222902",
+      "status": "unknown_candidate",
+      "enabled": true,
+      "interval_ms": 1000,
+      "known_fields": [],
+      "investigate": [
+        "hv_battery_temperature_candidate",
+        "charge_power_limit_candidate",
+        "discharge_power_limit_candidate"
+      ],
+      "confidence": "unconfirmed",
+      "notes": "Do not assume offset, scale, sign, endian or unit."
+    },
+    {
+      "did": "2922",
+      "command": "222922",
+      "status": "unknown_candidate",
+      "enabled": true,
+      "interval_ms": 1000,
+      "known_fields": [],
+      "investigate": [
+        "hv_battery_temperature_candidate",
+        "charge_power_limit_candidate",
+        "discharge_power_limit_candidate"
+      ],
+      "confidence": "unconfirmed",
+      "notes": "Do not assume offset, scale, sign, endian or unit."
+    }
+  ],
+  "markers": ["FULL_ACCEL", "REGEN", "IDLE", "COLD", "HOT", "CUSTOM"],
+  "logging": {
+    "format": "jsonl",
+    "preserve_raw_response": true,
+    "preserve_reassembled_payload": true,
+    "log_tx": true,
+    "log_rx": true,
+    "log_timeouts": true,
+    "log_reconnects": true,
+    "decode_known_reference_dids": true
+  }
+}
