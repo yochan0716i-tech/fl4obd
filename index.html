@@ -1303,7 +1303,7 @@ function onPollTimeout() {
 async function initElm() {
   // ペンディングコマンドをキャンセルしてUARTバッファをクリア
   try { await sendRaw('\r'); } catch(e) {}
-  await new Promise(r => setTimeout(r, 200));
+  await new Promise(r => setTimeout(r, 1000));
   rxBuf = '';
 
   // ATZ 送信 → "ELM327" を含む応答が来るまで待つ（タイムアウト2秒）
