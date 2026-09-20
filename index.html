@@ -360,7 +360,7 @@ import { CAL, decode2920, powers } from './lib/did2920.js';
  * 画面右上と保存ログの App: 行で確かめる。取得したログがどの版のものかも
  * これで後から特定できる。
  */
-const APP_VER = 'v20260901c';
+const APP_VER = 'v20260920a';
 
 // ─── Log ─────────────────────────────────────────────────
 let logBuffer = [];
@@ -1301,9 +1301,11 @@ function onPollTimeout() {
 }
 
 async function initElm() {
-  // ペンディングコマンドをキャンセルしてUARTバッファをクリア
-  try { await sendRaw('\r'); } catch(e) {}
-  await new Promise(r => setTimeout(r, 1000));
+  // 最初の ATZ は進行中コマンドの停止に消費される場合がある。
+  // 空文字は任意の応答ブロックに一致し、STOPPED を含め '>' 受信まで待つ。
+  const stopWait = waitForResponse('', 2000);
+  try { await sendRaw('ATZ'); } catch(e) {}
+  await stopWait;
   rxBuf = '';
 
   // ATZ 送信 → "ELM327" を含む応答が来るまで待つ（タイムアウト2秒）
