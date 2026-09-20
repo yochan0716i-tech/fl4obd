@@ -8,7 +8,7 @@
 <h1>FL4 OBD ANALYZER <small>v1.1 · READ ONLY</small></h1>
 <p>未知DIDの生応答を収録します。2902 / 2922の意味・単位は未確定です。マーカー操作は停車時または同乗者が行ってください。</p>
 <div id="message" role="status" aria-live="polite">プロファイルを読み込み中…</div>
-<div class="buttons"><button id="connect" disabled>CONNECT</button><button id="disconnect" disabled>DISCONNECT</button><button id="start" disabled>REC START</button><button id="stop" disabled>REC STOP</button><button id="save">解析用JSONL</button><button id="saveFull">完全ログJSONL</button></div>
+<div class="buttons"><button id="connect" disabled>CONNECT</button><button id="disconnect" disabled>DISCONNECT</button><button id="start" disabled>REC START</button><button id="stop" disabled>REC STOP</button><button id="save">解析用JSONL</button><button id="saveFull">完全ログJSONL</button><button id="clearLogs" disabled>端末内ログCLEAR</button></div>
 <section><dl class="status">
 <div><dt>接続状態</dt><dd id="state">未接続</dd></div><div><dt>デバイス</dt><dd id="device">—</dd></div><div><dt>プロファイル</dt><dd id="profile">—</dd></div>
 <div><dt>ELM</dt><dd id="elm">—</dd></div><div><dt>Protocol</dt><dd id="protocol">—</dd></div><div><dt>実行中command</dt><dd id="command">—</dd></div>
@@ -29,5 +29,5 @@
 <button type="button" data-mark="CUSTOM" disabled>CUSTOM</button>
 </div></section>
 <section><h2>直近イベント</h2><p>一覧は直近60件です。解析用JSONLは現在または直近RECのみ（rx_chunk除外）、完全ログJSONLは過去セッション・REC外・rx_chunkを含む全イベントを保存します。どちらもrxのraw / payload / decodedは保持します。ログは端末内に保持され、保存後も削除しません。</p><ol id="recent"></ol></section>
-<script type="module" src="./lib/analyzer-app.js"></script>
+<script type="module" src="./lib/analyzer-app.js?v=20260920g"></script>
 </body></html>
