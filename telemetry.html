@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FL4 TELEMETRY</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+<style>
+:root{color-scheme:dark;--bg:#0b111b;--panel:#131e2d;--line:#29384a;--text:#dce7f3;--muted:#92a5bb;--accent:#64e0ca}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px system-ui,sans-serif}header{padding:24px 32px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:20px}h1{font-size:20px;letter-spacing:3px;margin:0}header p{margin:7px 0 0;color:var(--muted);font-size:12px}button,select{background:#172639;color:var(--text);border:1px solid var(--line);border-radius:7px;padding:9px 13px;font:inherit;cursor:pointer}button.active{background:var(--accent);color:#09151b;border-color:var(--accent)}button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:3px}.file-button{display:inline-block;border:1px solid var(--accent);border-radius:7px;padding:10px 16px;cursor:pointer}#file{max-width:240px}main{max-width:1600px;margin:auto;padding:24px 32px}#drop{padding:70px 20px;text-align:center;border:1px dashed #536b87;border-radius:12px;color:var(--muted)}#drop.drag{border-color:var(--accent);background:#182e36}#drop h2{color:var(--text)}#status{color:var(--muted);overflow-wrap:anywhere;margin-bottom:16px}#controls{position:sticky;top:0;z-index:3;background:#0b111bf5;padding:14px 0;border-bottom:1px solid var(--line);margin-bottom:18px}.toolbar{display:flex;flex-wrap:wrap;gap:14px;align-items:center}.switch{display:flex;gap:5px}.cursor-row{display:flex;align-items:center;gap:16px;margin-top:16px}#cursor{flex:1;min-width:80px;accent-color:var(--accent)}#time{font:600 19px ui-monospace,monospace;min-width:110px}.hint{color:var(--muted);font-size:12px;margin:10px 0 0}.legend{display:flex;gap:16px;flex-wrap:wrap;margin:15px 0;color:var(--muted);font-size:12px}.dot{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:5px}#panels{display:grid;gap:16px;grid-template-columns:1fr}#panels.grid{grid-template-columns:repeat(var(--cols,2),minmax(0,1fr))}.panel{min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px}.panel-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:12px}.panel h2{font-size:14px;font-weight:600;letter-spacing:1px;margin:0}.value{font:600 21px ui-monospace,monospace}.plot{height:200px;position:relative}.grid .plot{height:220px}.detail .plot{height:470px}.series-values{font:12px ui-monospace,monospace;color:var(--muted);min-height:18px;margin-top:10px}.empty{color:var(--muted);font-size:12px}[hidden]{display:none!important}@media(max-width:900px){#panels.grid{grid-template-columns:repeat(2,minmax(0,1fr))}main{padding:16px}header{padding:20px 16px}.detail .plot{height:360px}}@media(max-width:580px){#panels.grid{grid-template-columns:1fr}.toolbar{gap:9px}header{flex-direction:column;align-items:flex-start}.value{font-size:18px}}
+</style></head>
+<body>
+<header><div><h1>FL4 TELEMETRY</h1><p>走行ログを、同じ時刻で読み解く。</p></div><label class="file-button">ログを開く <input id="file" type="file" accept=".txt,.csv,text/plain,text/csv" aria-label="走行ログファイル"></label></header>
+<main><div id="status" role="status" aria-live="polite">TXT / CSV · ファイルはこのブラウザ内で処理します。</div>
+<div id="drop"><h2>走行ログをドロップ</h2><p>または右上の「ログを開く」から選択してください。</p><p>Veepeak / 従来ELM327ログに対応</p></div>
+<section id="workspace" hidden>
+<div id="controls"><div class="toolbar"><div class="switch" role="group" aria-label="表示モード"><button data-layout="stacked" class="active" aria-pressed="true">STACKED</button><button data-layout="grid" aria-pressed="false">GRID</button><button data-layout="detail" aria-pressed="false">DETAIL</button></div><label id="columnsWrap" hidden>列数 <select id="columns"><option value="2">2列</option><option value="3">3列</option></select></label><label id="metricWrap" hidden>表示項目 <select id="metric"></select></label></div>
+<div class="cursor-row"><output id="time">0.000 s</output><input id="cursor" aria-label="共通時間カーソル" type="range" min="0" max="1" step="0.001" value="0"></div><p class="hint">グラフをクリック・ドラッグすると全パネルが同期します。スライダーは矢印キーでも操作できます。</p></div>
+<div class="legend" id="modeLegend"></div><div id="panels"></div>
+</section></main>
+<script type="module">
+import { decode2920, powers } from './lib/did2920.js';
+// ログ形式・オフセット・換算係数は viewer.html の既存処理を流用する。
+let stableMode = -1;
+function reassemble2920(rxRaw){
+  const frames={};
+  for(const tok of rxRaw.trim().split(/\s+/)){
+    let m;
+    if((m=tok.match(/^([0-9A-F]):([0-9A-F]+)$/i)))      frames[parseInt(m[1],16)]=m[2];
+    else if((m=tok.match(/^(1[0-5])([0-9A-F]{14})$/i))) frames[+m[1]]=m[2];
+  }
+  // 欠落・途中切れを詰めて連結するとフィールド位置がずれるため除外する。
+  let full='';
+  for(let i=0;i<=15;i++){
+    if(!frames[i] || frames[i].length !== (i===0 ? 12 : 14)) return '';
+    full+=frames[i];
+  }
+  return full;
+}
+
+function compute2920(full){
+  const f = decode2920(full);
+  if(!f) return null;
+  const p = powers(f);
+  return { vsp:f.vsp, engRpm:f.rpm, mode:f.mode, pbat:f.pbat,
+           peng:p.peng, pgen:p.pgen, pdrive:p.pdrive, v12:f.v12 };
+}
+
+function updateStableMode(m){
+  if(m===20||m===40||m===50||m===70) stableMode=m;
+  else if(m===10 && stableMode===20) stableMode=40;
+  else if(m===30 && (stableMode===40||stableMode===50||stableMode===70)) stableMode=20;
+  return stableMode;
+}
+
+function detectFormat(text) {
+  const first = text.trimStart().split('\n')[0];
+  return first.startsWith('timestamp,') ? 'csv' : 'debug';
+}
+
+function parseCsvLog(text) {
+  const ds = emptyDs();
+  const lines = text.trim().split('\n');
+  let t0 = null;
+
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i].split(',');
+    if (cols.length < 8) continue;
+    const ts = new Date(cols[0]).getTime();
+    if (isNaN(ts)) continue;
+    if (t0 === null) t0 = ts;
+    const t = (ts - t0) / 1000;
+
+    const push = (arr, v) => { const n = parseFloat(v); if (!isNaN(n)) arr.push({ x: t, y: n }); };
+    push(ds.rpm,     cols[1]);
+    push(ds.speed,   cols[2]);
+    push(ds.vbat,    cols[3]);
+    push(ds.ibat,    cols[4]);
+    push(ds.pbat,    cols[5]);
+    push(ds.soc,     cols[6]);
+    push(ds.sysv,    cols[7]);
+    push(ds.engTemp, cols[8]);
+    push(ds.catTemp, cols[9]);
+    push(ds.intTemp, cols[10]);
+  }
+  return ds;
+}
+
+function parseDebugLog(text) {
+  const ds = emptyDs();
+  let startMs = null;
+  let lastSoc = NaN;
+  const sysv2920 = [];   // 12V を 2920(byte14) から拾う。PID42より高レート
+  stableMode = -1;   // モード遷移ホールドを先頭からやり直し
+
+  function extractMs(line) {
+    const m = line.match(/^\[(\d{2}):(\d{2}):(\d{2})\.(\d{3})\]/);
+    if (!m) return null;
+    return +m[1] * 3600000 + +m[2] * 60000 + +m[3] * 1000 + +m[4];
+  }
+
+  for (const line of text.split('\n')) {
+    const ms = extractMs(line);
+    if (ms === null) continue;
+    if (startMs === null) startMs = ms;
+    const t = (ms - startMs) / 1000;
+
+    // 9A: applyMulti9A が出力するデコード済みログ行から取得
+    const cfm = line.match(/\[9A\] CF=.* ibat=([0-9.-]+)A vbat=([0-9.-]+)V/);
+    if (cfm) {
+      const ibat = parseFloat(cfm[1]);
+      const vbat = parseFloat(cfm[2]);
+      ds.vbat.push({ x: t, y: vbat });
+      ds.ibat.push({ x: t, y: ibat });
+      ds.pbat.push({ x: t, y: +(vbat * ibat / 1000).toFixed(2) });
+      continue;
+    }
+
+    // シングルフレームPID: [ok ] ← 行の生フレームをデコード
+    const okm = line.match(/\[ok \] ← (.+)/);
+    if (!okm) continue;
+    const raw = okm[1].trim().toUpperCase();
+
+    // 2920 マルチフレーム応答 → フロー用フィールド + POWERチャート
+    if (raw.includes('622920')) {
+      const full = reassemble2920(raw);
+      const f = compute2920(full);
+      if (f) {
+        const dispMode = updateStableMode(f.mode);
+        ds.pdrive.push({ x: t, y: +f.pdrive.toFixed(2) });
+        ds.peng.push({   x: t, y: +f.peng.toFixed(2) });
+        ds.pgen.push({   x: t, y: +f.pgen.toFixed(2) });
+        ds.pbat20.push({ x: t, y: +f.pbat.toFixed(2) });
+        ds.mode.push({   x: t, y: f.mode });
+        ds.speed.push({  x: t, y: f.vsp });
+        ds.rpm.push({    x: t, y: Math.round(f.engRpm) });
+        ds.flow.push({ t, dispMode, ...f, soc: lastSoc });
+        if (f.v12) sysv2920.push({ x: t, y: +f.v12.toFixed(2) });
+        continue;
+      }
+    }
+
+    const last = {};
+    for (const tok of raw.split(/\s+/)) {
+      if (tok.startsWith('410C') && tok.length >= 8) {
+        const a = parseInt(tok.slice(4,6), 16), b = parseInt(tok.slice(6,8), 16);
+        if (!isNaN(a+b)) last.rpm = Math.round((256*a+b)/4);
+      } else if (tok.startsWith('410D') && tok.length >= 6) {
+        const a = parseInt(tok.slice(4,6), 16);
+        if (!isNaN(a)) last.speed = a;
+      } else if (tok.startsWith('415B') && tok.length >= 6) {
+        const a = parseInt(tok.slice(4,6), 16);
+        if (!isNaN(a)) last.soc = +(100*a/255).toFixed(1);
+      } else if (tok.startsWith('4142') && tok.length >= 8) {
+        const a = parseInt(tok.slice(4,6), 16), b = parseInt(tok.slice(6,8), 16);
+        if (!isNaN(a+b)) last.sysv = +((256*a+b)/1000).toFixed(2);
+      } else if (tok.startsWith('4167') && tok.length >= 8) {
+        const bitmap = parseInt(tok.slice(4,6), 16), s1 = parseInt(tok.slice(6,8), 16);
+        if (!isNaN(bitmap) && (bitmap & 0x01)) last.engTemp = s1 - 40;
+      } else if (tok.startsWith('413C') && tok.length >= 8) {
+        const a = parseInt(tok.slice(4,6), 16), b = parseInt(tok.slice(6,8), 16);
+        if (!isNaN(a+b)) last.catTemp = +((256*a+b)/10 - 40).toFixed(1);
+      } else if (tok.startsWith('4168') && tok.length >= 8) {
+        const bitmap = parseInt(tok.slice(4,6), 16), s1 = parseInt(tok.slice(6,8), 16);
+        if (!isNaN(bitmap) && (bitmap & 0x01)) last.intTemp = s1 - 40;
+      }
+    }
+    if (last.soc != null) lastSoc = last.soc;
+    for (const [k, v] of Object.entries(last)) ds[k].push({ x: t, y: v });
+  }
+  // 12V: 2920由来(byte14,高レート)と PID42由来 のうち、点数の多い(=サンプリング細かい)方を採用
+  if (sysv2920.length > ds.sysv.length) ds.sysv = sysv2920;
+  return ds;
+}
+
+function emptyDs() {
+  return {
+    speed: [], rpm: [],
+    vbat: [], ibat: [], pbat: [],
+    soc: [], sysv: [],
+    engTemp: [], catTemp: [], intTemp: [],
+    // 2920由来（POWERチャート + フロー再生）
+    pdrive: [], peng: [], pgen: [], pbat20: [], mode: [],
+    flow: []
+  };
+}
+const METRICS={
+ speed:{label:'Speed',unit:'km/h',color:'#64e0ca',key:'speed',related:['rpm']},
+ rpm:{label:'RPM',unit:'rpm',color:'#6ea8ff',key:'rpm',related:['peng']},
+ soc:{label:'SOC',unit:'%',color:'#4fd6f5',key:'soc',related:['pbat']},
+ mode:{label:'Mode',unit:'',color:'#c4b8ff',key:'mode',related:['speed','rpm']},
+ pbat:{label:'Pbat',unit:'kW',color:'#c5a1ff',key:'pbat20',related:['peng','pwheel']},
+ peng:{label:'Peng',unit:'kW',color:'#ff956c',key:'peng',related:['pwheel','pbat']},
+ pwheel:{label:'Pwheel',unit:'kW',color:'#ffc774',key:'pdrive',related:['peng','pbat']},
+ sysv:{label:'SysV',unit:'V',color:'#d6cbff',key:'sysv',related:['soc']}
+};
+const STATES={EV:'#64e0ca',SERIES:'#6ea8ff',DIRECT:'#ffb66e',TRANS:'#b29bd8',UNKNOWN:'#718096'};
+const state=v=>({20:'EV',40:'SERIES',50:'DIRECT',70:'DIRECT',10:'TRANS',30:'TRANS',60:'TRANS'}[v]||'UNKNOWN');
+const $=id=>document.getElementById(id);
+let ds=null,layout='stacked',selected='speed',cursor=0,duration=0,charts=[],bands=[],raf=0,loadId=0;
+for(const [k,m] of Object.entries(METRICS))$('metric').add(new Option(m.label,k));
+for(const [name,color] of Object.entries(STATES)){const el=document.createElement('span');el.innerHTML=`<i class="dot" style="background:${color}"></i>${name}`;$('modeLegend').append(el);}
+function points(key){if(!ds)return [];const m=METRICS[key];return key==='pbat'&&!ds.pbat20.length?ds.pbat:ds[m.key];}
+function at(data,t){let lo=0,hi=data.length;while(lo<hi){const mid=(lo+hi)>>1;if(data[mid].x<=t)lo=mid+1;else hi=mid;}return lo?data[lo-1].y:null;}
+function format(key,v){if(v===null||!Number.isFinite(v))return '—';if(key==='mode')return state(v);return (['rpm','speed'].includes(key)?Math.round(v):v.toFixed(key==='sysv'?2:1))+(METRICS[key].unit?' '+METRICS[key].unit:'');}
+function updateCursor(t){cursor=Math.max(0,Math.min(duration,t));$('cursor').value=cursor;$('time').textContent=cursor.toFixed(3)+' s';for(const item of charts){item.value.textContent=format(item.key,at(points(item.key),cursor));item.extra.textContent=item.keys.filter(k=>k!==item.key).map(k=>METRICS[k].label+' '+format(k,at(points(k),cursor))).join('  ·  ');}if(!raf)raf=requestAnimationFrame(()=>{raf=0;for(const c of charts)c.chart.draw();});}
+const cursorPlugin={id:'sharedTime',afterDraw(chart){const a=chart.chartArea;if(!a)return;const x=chart.scales.x.getPixelForValue(cursor),ctx=chart.ctx;ctx.save();ctx.strokeStyle='#f1f7ff';ctx.lineWidth=1;ctx.setLineDash([4,3]);ctx.beginPath();ctx.moveTo(x,a.top);ctx.lineTo(x,a.bottom);ctx.stroke();ctx.restore();}};
+const modePlugin={id:'modeBands',beforeDatasetsDraw(chart){const a=chart.chartArea,ctx=chart.ctx;ctx.save();ctx.beginPath();ctx.rect(a.left,a.top,a.width,a.height);ctx.clip();for(const b of bands){const x=chart.scales.x.getPixelForValue(b.start),end=chart.scales.x.getPixelForValue(b.end);ctx.fillStyle=STATES[b.name];ctx.globalAlpha=layout==='detail'?0.23:0.75;ctx.fillRect(x,a.top,Math.max(1,end-x),a.height);if(end-x>65){ctx.globalAlpha=1;ctx.fillStyle=layout==='detail'?'#fff':'#0b111b';ctx.font='11px system-ui';ctx.fillText(b.name,x+5,a.top+20);}}ctx.restore();}};
+function build(){for(const c of charts)c.chart.destroy();charts=[];$('panels').replaceChildren();$('panels').className=layout;$('panels').style.setProperty('--cols',$('columns').value);$('columnsWrap').hidden=layout!=='grid';$('metricWrap').hidden=layout!=='detail';
+ for(const key of layout==='detail'?[selected]:Object.keys(METRICS)){
+ const m=METRICS[key],keys=layout==='detail'?[key,...m.related]:[key],numeric=keys.filter(k=>k!=='mode');
+ const card=document.createElement('article');card.className='panel';const head=document.createElement('div');head.className='panel-head';const title=document.createElement('h2');title.textContent=m.label;title.style.color=m.color;const value=document.createElement('output');value.className='value';head.append(title,value);card.append(head);const plot=document.createElement('div');plot.className='plot';const canvas=document.createElement('canvas');canvas.setAttribute('role','img');canvas.setAttribute('aria-label',m.label+' 時系列グラフ');plot.append(canvas);card.append(plot);const extra=document.createElement('div');extra.className='series-values';card.append(extra);if(!points(key).length){const empty=document.createElement('p');empty.className='empty';empty.textContent='このログには '+m.label+' のデータがありません。';card.append(empty);}$('panels').append(card);
+ const units=[...new Set(numeric.map(k=>METRICS[k].unit))],scales={x:{type:'linear',min:0,max:duration||1,ticks:{color:'#92a5bb',maxTicksLimit:layout==='grid'?5:10},grid:{color:'#253345'},title:{display:true,text:'経過時間 (s)',color:'#92a5bb'}}};
+ units.forEach((unit,i)=>{scales['y'+i]={type:'linear',position:i?'right':'left',title:{display:true,text:unit,color:'#92a5bb'},ticks:{color:'#92a5bb'},grid:{color:i?'transparent':'#253345'},afterFit:s=>{s.width=58;}};});if(!units.length)scales.y={display:false,min:0,max:1};
+ const chart=new Chart(canvas,{type:'line',data:{datasets:numeric.map(k=>({label:METRICS[k].label+' ('+METRICS[k].unit+')',data:points(k),borderColor:METRICS[k].color,borderWidth:k===key?1.6:1,pointRadius:0,yAxisID:'y'+units.indexOf(METRICS[k].unit),stepped:k==='soc'?'before':false}))},options:{animation:false,responsive:true,maintainAspectRatio:false,parsing:false,normalized:true,events:[],plugins:{legend:{display:layout==='detail',labels:{color:'#dce7f3',boxWidth:12}},tooltip:{enabled:false}},scales},plugins:key==='mode'?[modePlugin,cursorPlugin]:[cursorPlugin]});
+ const fromEvent=e=>{const r=canvas.getBoundingClientRect(),px=(e.clientX-r.left)*chart.width/r.width;updateCursor(chart.scales.x.getValueForPixel(px));};canvas.style.touchAction='none';canvas.addEventListener('pointerdown',e=>{if(e.button!==0)return;canvas.setPointerCapture(e.pointerId);fromEvent(e);});canvas.addEventListener('pointermove',e=>{if(canvas.hasPointerCapture(e.pointerId))fromEvent(e);});canvas.addEventListener('pointerup',e=>{if(canvas.hasPointerCapture(e.pointerId)){fromEvent(e);canvas.releasePointerCapture(e.pointerId);}});
+ charts.push({key,keys,chart,value,extra});
+ }updateCursor(cursor);
+}
+async function loadFile(file){if(!file)return;const id=++loadId;$('status').textContent='読み込み中…';try{const text=await file.text();if(id!==loadId)return;if(typeof Chart==='undefined')throw new Error('グラフライブラリを読み込めません。ネット接続を確認して再読み込みしてください。');const fmt=detectFormat(text),next=fmt==='csv'?parseCsvLog(text):parseDebugLog(text);let end=0,count=0;for(const value of Object.values(next))for(const p of value){if(Number.isFinite(p.x)&&Number.isFinite(p.y)){end=Math.max(end,p.x);count++;}}if(!count)throw new Error('表示できるデータがありません。ログ形式を確認してください。');ds=next;duration=end;cursor=0;bands=[];for(const p of ds.mode){const name=state(p.y),last=bands.at(-1);if(last&&last.name===name)continue;if(last)last.end=p.x;bands.push({start:p.x,end:duration,name});}$('cursor').max=duration||1;$('workspace').hidden=false;$('drop').hidden=true;$('status').textContent=file.name+' · '+duration.toFixed(1)+' s · 2920: '+ds.flow.length.toLocaleString()+' 点 · SOC: '+ds.soc.length+' 点';build();}catch(e){$('status').textContent='読み込みエラー: '+e.message;}}
+$('file').addEventListener('change',e=>loadFile(e.target.files[0]));
+for(const el of [document.body]){el.addEventListener('dragover',e=>{e.preventDefault();$('drop').classList.add('drag');});el.addEventListener('dragleave',()=> $('drop').classList.remove('drag'));el.addEventListener('drop',e=>{e.preventDefault();$('drop').classList.remove('drag');loadFile(e.dataTransfer.files[0]);});}
+for(const button of document.querySelectorAll('[data-layout]'))button.addEventListener('click',()=>{layout=button.dataset.layout;for(const b of document.querySelectorAll('[data-layout]')){b.classList.toggle('active',b===button);b.setAttribute('aria-pressed',b===button);}if(ds)build();});
+$('metric').addEventListener('change',e=>{selected=e.target.value;if(ds)build();});$('columns').addEventListener('change',()=>{if(ds)build();});$('cursor').addEventListener('input',e=>updateCursor(+e.target.value));
+</script></body></html>
