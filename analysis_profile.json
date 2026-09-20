@@ -4,7 +4,10 @@
   "description": "FL4 e:HEV battery thermal / charge-discharge limit exploration profile",
   "safety": {
     "read_only": true,
-    "allowed_obd_services": ["01", "22"],
+    "allowed_obd_services": [
+      "01",
+      "22"
+    ],
     "forbidden_operations": [
       "write_data_by_identifier",
       "routine_control",
@@ -23,8 +26,20 @@
       "interval_ms": 200,
       "decoder": "./lib/did2920.js",
       "known_fields": [
-        "vsp", "v12", "accel", "mode", "pbat", "drv", "gen", "eng", "rpm", "coolant",
-        "peng", "pgen", "pdrive", "psys"
+        "vsp",
+        "v12",
+        "accel",
+        "mode",
+        "pbat",
+        "drv",
+        "gen",
+        "eng",
+        "rpm",
+        "coolant",
+        "peng",
+        "pgen",
+        "pdrive",
+        "psys"
       ],
       "investigate": [],
       "notes": "Use as correlation/reference signal. Preserve raw payload."
@@ -60,7 +75,15 @@
       "notes": "Do not assume offset, scale, sign, endian or unit."
     }
   ],
-  "markers": ["FULL_ACCEL", "REGEN", "IDLE", "COLD", "HOT", "CUSTOM"],
+  "markers": [
+    "BRAKE",
+    "ACCEL",
+    "BRAKE+ACCEL",
+    "LIGHT",
+    "HIGH_BEAM",
+    "A/C",
+    "CUSTOM"
+  ],
   "logging": {
     "format": "jsonl",
     "preserve_raw_response": true,
@@ -70,5 +93,18 @@
     "log_timeouts": true,
     "log_reconnects": true,
     "decode_known_reference_dids": true
-  }
+  },
+  "pids": [
+    {
+      "pid": "5B",
+      "command": "015B",
+      "status": "known_reference",
+      "enabled": true,
+      "interval_ms": 1000,
+      "known_fields": [
+        "soc"
+      ],
+      "notes": "Standard PID 5B: SOC [%] = A * 100 / 255; same scaling as index.html."
+    }
+  ]
 }

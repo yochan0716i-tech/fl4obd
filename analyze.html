@@ -1,10 +1,11 @@
 <!DOCTYPE html>
 <html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>FL4 OBD ANALYZER v1</title>
+<title>FL4 OBD ANALYZER v1.1</title>
 <style>
 :root{color-scheme:dark;font:14px system-ui;color:#dce8f2;background:#0b1520}*{box-sizing:border-box}body{max-width:1150px;margin:auto;padding:24px}h1{font-size:22px;letter-spacing:2px}h2{font-size:16px;color:#84d9ce}p{color:#9bb0c4;line-height:1.6}.buttons{display:flex;gap:10px;flex-wrap:wrap;margin:18px 0}button,input,select{font:inherit;border:1px solid #36516b;border-radius:5px;background:#132537;color:inherit;padding:10px}button{cursor:pointer}button:disabled{opacity:.4;cursor:default}#start{border-color:#fc7474}#save,#saveFull{border-color:#76e0c5}section{background:#102030;border:1px solid #263d53;border-radius:10px;padding:18px;margin:18px 0}.status{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}dt{color:#8ca3b9;font-size:12px}dd{margin:5px 0 0;overflow-wrap:anywhere}form{display:flex;gap:12px;flex-wrap:wrap;align-items:end}label{display:flex;flex-direction:column;gap:6px}.scroll{overflow:auto}table{width:100%;border-collapse:collapse;text-align:left}th,td{padding:10px;border-bottom:1px solid #263d53;white-space:nowrap}td input[type=number]{width:115px}#did{width:130px}#interval{width:140px}#note{min-width:240px;flex:1}#recent{font:12px ui-monospace,monospace;max-height:240px;overflow:auto;padding-left:22px}#message{padding:12px;border-left:3px solid #76e0c5;min-height:40px;overflow-wrap:anywhere}small{color:#8ca3b9}@media(max-width:650px){body{padding:12px}.status{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.marker-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:14px 0}.marker-grid button{min-height:72px;padding:18px 8px;font-size:18px;font-weight:700;touch-action:manipulation}.marker-grid button:active{background:#287166}.marker-grid button:focus-visible{outline:3px solid #76e0c5}@media(max-width:650px){.marker-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 </style></head><body>
-<h1>FL4 OBD ANALYZER <small>v1 · READ ONLY</small></h1>
+<h1>FL4 OBD ANALYZER <small>v1.1 · READ ONLY</small></h1>
 <p>未知DIDの生応答を収録します。2902 / 2922の意味・単位は未確定です。マーカー操作は停車時または同乗者が行ってください。</p>
 <div id="message" role="status" aria-live="polite">プロファイルを読み込み中…</div>
 <div class="buttons"><button id="connect" disabled>CONNECT</button><button id="disconnect" disabled>DISCONNECT</button><button id="start" disabled>REC START</button><button id="stop" disabled>REC STOP</button><button id="save">解析用JSONL</button><button id="saveFull">完全ログJSONL</button></div>
@@ -13,10 +14,20 @@
 <div><dt>ELM</dt><dd id="elm">—</dd></div><div><dt>Protocol</dt><dd id="protocol">—</dd></div><div><dt>実行中command</dt><dd id="command">—</dd></div>
 <div><dt>REC</dt><dd id="recState">STOP</dd></div><div><dt>REC経過時間</dt><dd id="elapsed">—</dd></div><div><dt>保存対象</dt><dd id="size">0 events</dd></div>
 </dl></section>
-<section><h2>DIDスケジュール</h2><p>周期は目標値です。応答完了を優先し、同時に1要求だけ送信します。timeout中の回復・再接続もRECに記録します。</p>
-<div class="scroll"><table><thead><tr><th>有効</th><th>DID</th><th>command</th><th>周期 ms</th><th>分類</th><th>成功</th><th>失敗</th><th>最終応答 UTC</th><th></th></tr></thead><tbody id="dids"></tbody></table></div>
+<section><h2>DID / SOCスケジュール</h2><p>周期は目標値です。応答完了を優先し、同時に1要求だけ送信します。timeout中の回復・再接続もRECに記録します。</p>
+<div class="scroll"><table><thead><tr><th>有効</th><th>DID / PID</th><th>command</th><th>周期 ms</th><th>分類</th><th>成功</th><th>失敗</th><th>最終応答 UTC</th><th></th></tr></thead><tbody id="dids"></tbody></table></div>
 <form id="add"><label>DID（4hex）<input id="did" pattern="[0-9a-fA-F]{4}" maxlength="4" required placeholder="2902"></label><label>周期 ms<input id="interval" type="number" min="100" max="3600000" step="100" value="1000" required></label><button>DID追加</button></form></section>
-<section><h2>イベントマーカー</h2><div class="buttons"><label>ラベル<select id="marker"></select></label><label>メモ<input id="note" maxlength="1000"></label><button id="mark" disabled>MARK追加</button></div></section>
+<section><h2>イベントマーカー</h2><p>REC中にタップすると、その瞬間の時刻で記録します。メモはCUSTOMのみに付きます。</p>
+<label>CUSTOMメモ<input id="note" maxlength="1000" placeholder="任意のメモ"></label>
+<div class="marker-grid">
+<button type="button" data-mark="BRAKE" disabled>BRAKE</button>
+<button type="button" data-mark="ACCEL" disabled>ACCEL</button>
+<button type="button" data-mark="BRAKE+ACCEL" disabled>BRAKE+ACCEL</button>
+<button type="button" data-mark="LIGHT" disabled>LIGHT</button>
+<button type="button" data-mark="HIGH_BEAM" disabled>HIGH_BEAM</button>
+<button type="button" data-mark="A/C" disabled>A/C</button>
+<button type="button" data-mark="CUSTOM" disabled>CUSTOM</button>
+</div></section>
 <section><h2>直近イベント</h2><p>一覧は直近60件です。解析用JSONLは現在または直近RECのみ（rx_chunk除外）、完全ログJSONLは過去セッション・REC外・rx_chunkを含む全イベントを保存します。どちらもrxのraw / payload / decodedは保持します。ログは端末内に保持され、保存後も削除しません。</p><ol id="recent"></ol></section>
 <script type="module" src="./lib/analyzer-app.js"></script>
 </body></html>

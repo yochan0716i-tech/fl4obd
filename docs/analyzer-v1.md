@@ -86,3 +86,9 @@ The in-app browser did not expose a download completion event; validate the Andr
 - Long recordings, IndexedDB storage headroom and Android JSONL file download.
 
 Export-specific regression tests cover current/latest REC selection, rx_chunk removal only, full-history export, lossless JSONL fields, UI filenames, no-session guidance and STOP/START during save (9 tests).
+
+## v1.1: one-tap markers and SOC
+BRAKE / ACCEL / BRAKE+ACCEL / LIGHT / HIGH_BEAM / A/C / CUSTOM are direct buttons enabled only during REC. Each click emits the existing mark event immediately; only CUSTOM uses the note field.
+The profile adds PID 5B (015B), enabled at 1000 ms. SOC shares the same one-request-at-a-time overdue scheduler with existing DIDs; enable, period and counters are shown in the table. Reload restores profile defaults.
+SOC rx records retain raw/payload and add pid:"5B", decoded:{soc:A*100/255}. Padding is ignored. Missing SOC bytes are failures. NO DATA and timeouts use the existing recovery path. Session-end counts use key "015B", retaining the previous DID keys.
+Additional tests: node --test tools/analyzer-soc-marker-test.mjs

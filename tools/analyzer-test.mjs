@@ -7,7 +7,7 @@ const profile=JSON.parse(await readFile(new URL('../analysis_profile.json',impor
 const log=await readFile(new URL('testdata/dummy_drive.txt',sourceRoot),'utf8');
 const replies=log.split(/\r?\n/).filter(l=>l.includes('0:622920')).map(l=>l.slice(l.indexOf('←')+1).trim().replace(/\b(1[0-5])([0-9A-F]{14})\b/g,(_,n,data)=>(+n).toString(16).toUpperCase()+':'+data));
 test('profile and read-only command whitelist',()=>{
- assert.deepEqual(profileRows(profile).map(r=>[r.cmd,r.intervalMs]),[['222920',200],['222902',1000],['222922',1000]]);
+ assert.deepEqual(profileRows(profile).filter(r=>r.did).map(r=>[r.cmd,r.intervalMs]),[['222920',200],['222902',1000],['222922',1000]]);
  for(const cmd of ['ATSH18DAF107','ATFCSM1','1101','2E292000','3101','04','222920\r04','22GGGG','ATSP7'])assert.equal(allowed(cmd),false,cmd);
  for(const cmd of ['ATZ','ATSP0','011F','222920'])assert.equal(allowed(cmd),true,cmd);
  assert.throws(()=>row('2902\r04',1000));assert.throws(()=>row('2902',0));
