@@ -360,7 +360,7 @@ import { CAL, decode2920, powers } from './lib/did2920.js';
  * 画面右上と保存ログの App: 行で確かめる。取得したログがどの版のものかも
  * これで後から特定できる。
  */
-const APP_VER = 'v20260920c';
+const APP_VER = 'v20260920d';
 
 // ─── Log ─────────────────────────────────────────────────
 let logBuffer = [];
@@ -971,7 +971,6 @@ function parseBlock(block) {
 
   for (const line of lines) {
     if (/^(SEARCHING|NO DATA|ERROR|UNABLE|BUS)/i.test(line)) continue;
-    if (/^[A-Za-z]/.test(line) && !/^[46][0-9A-Fa-f]/i.test(line)) continue;
 
     // マルチフレーム関連行: "N:hex"(コロン付き 0-9) だけでなく、
     // このドングルがフレーム10-15を "NN"+7バイト(コロン無し・計16文字) で
@@ -988,6 +987,9 @@ function parseBlock(block) {
       }
       continue;
     }
+
+    // A:〜F: で始まるフレーム行を拾った後で、AT応答等の文字行を除外する。
+    if (/^[A-Za-z]/.test(line) && !/^[46][0-9A-Fa-f]/i.test(line)) continue;
 
     // 純粋なシングルフレーム連結行 (Service01: 415B/4142/411F 等)
     const hex = line.replace(/\s+/g, '');
