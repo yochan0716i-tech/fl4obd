@@ -330,15 +330,20 @@ function drawFlow(){
 }
 
 /* ── 2920 マルチフレーム再構成 + フィールド算出 ───────────── */
-// ログ行の受信部 "0:6229.. 1:.. .. 1563.." を結合(10-15はコロン無し)
+// 0:〜F:（16進番号）と、従来の0:〜9: + 10〜15（コロン無し）を結合
 function reassemble2920(rxRaw){
   const frames={};
   for(const tok of rxRaw.trim().split(/\s+/)){
     let m;
-    if((m=tok.match(/^(\d):([0-9A-F]+)$/i)))            frames[+m[1]]=m[2];
+    if((m=tok.match(/^([0-9A-F]):([0-9A-F]+)$/i)))      frames[parseInt(m[1],16)]=m[2];
     else if((m=tok.match(/^(1[0-5])([0-9A-F]{14})$/i))) frames[+m[1]]=m[2];
   }
-  let full=''; for(let i=0;i<=15;i++) if(frames[i]!==undefined) full+=frames[i];
+  // 欠落・途中切れを詰めて連結するとフィールド位置がずれるため除外する。
+  let full='';
+  for(let i=0;i<=15;i++){
+    if(!frames[i] || frames[i].length !== (i===0 ? 12 : 14)) return '';
+    full+=frames[i];
+  }
   return full;
 }
 /* フィールド定義と係数は lib/did2920.js。ここは従来の戻り値の形へ合わせるだけ。 */
