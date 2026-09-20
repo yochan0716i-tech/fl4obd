@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>FL4 走行リプレイ (OSM + GPS + Flow)</title>
+<title>FL4 走行リプレイ / Telemetry Dashboard</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
   * { box-sizing: border-box; }
@@ -64,6 +64,53 @@
   #modeSection { margin-top:12px; }
   #modeSection .mlabel { color:#7a95ad; font-size:10px; margin-bottom:2px; text-align:center; }
   #modeSvg { width:100%; height:auto; display:block; }
+
+  /* ── OBD-only telemetry dashboard ───────────────────────── */
+  #dashOnly{display:none;grid-area:dash;min-width:0;min-height:0;}
+  #app.obd-only{grid-template-columns:1fr;grid-template-rows:minmax(0,1fr) auto;grid-template-areas:"dash" "ctrl";gap:6px;padding:6px;}
+  #app.obd-only #s1,#app.obd-only #s2,#app.obd-only #s3{display:none;}
+  #app.obd-only #dashOnly{display:grid;}
+  .tdash{height:100%;min-height:0;display:grid;grid-template-columns:minmax(250px,31%) 1fr;gap:10px;}
+  .tleft{display:grid;grid-template-rows:1fr 1fr;gap:10px;min-height:0;}
+  .tright{display:grid;grid-template-rows:auto minmax(0,1fr) auto;gap:10px;min-height:0;}
+  .tpanel{position:relative;min-width:0;min-height:0;overflow:hidden;border:1px solid #29445c;border-radius:12px;background:linear-gradient(145deg,#0d1f2d,#07121c);box-shadow:inset 0 0 24px #0003;}
+  .tgaugeCard{display:grid;place-items:center;padding:16px;}
+  .tgaugeTitle{position:absolute;top:14px;left:16px;font-size:clamp(16px,1.5vw,24px);font-weight:800;letter-spacing:.05em;color:#edf6ff;z-index:2;}
+  .tgaugeTitle small{display:block;color:#8fa8bd;font-size:.55em;font-weight:500;margin-top:1px;}
+  .tgauge{--arc:25%;--accent:#1ee7f2;width:min(88%,330px);aspect-ratio:1;border-radius:50%;position:relative;display:grid;place-items:center;background:radial-gradient(circle,#09131d 0 58%,transparent 59%),conic-gradient(from 225deg,var(--accent) 0 var(--arc),#193142 var(--arc) 75%,transparent 75% 100%);filter:drop-shadow(0 0 14px #1ee7f211);}
+  .tgauge:before{content:"";position:absolute;inset:7%;border-radius:50%;border:2px solid #91b9d624;box-shadow:inset 0 0 0 10px #ffffff03;}
+  .tgaugeCenter{text-align:center;z-index:2;margin-top:17%;}
+  .tgaugeValue{font-size:clamp(48px,6vw,94px);font-weight:850;line-height:.9;letter-spacing:-.055em;font-variant-numeric:tabular-nums;}
+  .tgaugeUnit{font-size:clamp(16px,1.8vw,28px);margin-top:10px;color:#cfe5f5;}
+  .statusRow{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .statusCard{min-height:96px;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;}
+  .teye{color:#a8c2d5;font-size:clamp(12px,1vw,16px);font-weight:700;letter-spacing:.08em;}
+  .tstatusValue{margin-top:5px;font-size:clamp(26px,3vw,46px);line-height:1;font-weight:900;letter-spacing:.02em;}
+  .modeStrip{display:flex;gap:9px;color:#7793a8;font-size:clamp(9px,.78vw,12px);letter-spacing:.05em;}
+  .modeStrip .active{color:#1ee7f2;text-shadow:0 0 10px #1ee7f266;}
+  #energyCard.recharge{border-color:#43f0a3;box-shadow:0 0 0 1px #43f0a32a,0 0 22px #43f0a334,inset 0 0 28px #43f0a30b;}
+  #energyCard.recharge #energyValue{color:#43f0a3;text-shadow:0 0 15px #43f0a34d;}
+  .tprimary{display:grid;grid-template-columns:1fr 1.08fr;gap:10px;min-height:0;}
+  .metricMain{padding:20px 22px;display:flex;flex-direction:column;justify-content:center;}
+  .metricHead{display:flex;align-items:baseline;gap:9px;color:#bfd3e1;font-size:clamp(15px,1.25vw,20px);font-weight:800;}
+  .metricCode{color:#7291a8;font-size:.72em;font-weight:600;}
+  .metricValue{margin-top:10px;font-size:clamp(48px,6vw,92px);line-height:.95;font-weight:900;letter-spacing:-.05em;font-variant-numeric:tabular-nums;}
+  .metricValue .unit{font-size:.44em;margin-left:6px;color:#e0edf6;letter-spacing:0;}
+  #pbatValue.drive{color:#1ee7f2;} #pbatValue.recharge{color:#43f0a3;}
+  .segbar{margin-top:20px;height:15px;display:grid;gap:3px;grid-template-columns:repeat(12,1fr);}
+  .segbar i{display:block;border-radius:2px;background:#173247;transform:skewX(-12deg);}
+  .segbar i.on{background:linear-gradient(90deg,#18dbe6,#2affc8);box-shadow:0 0 8px #27ead433;}
+  .pbar{grid-template-columns:repeat(16,1fr);}
+  .powerScale{margin-top:10px;display:flex;justify-content:space-between;color:#7894aa;font-size:clamp(10px,.8vw,13px);}
+  .secondaryGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+  .smallMetric{min-height:112px;padding:14px 16px;display:flex;flex-direction:column;justify-content:center;}
+  .smallTitle{color:#bfd3e1;font-size:clamp(12px,1vw,17px);font-weight:800;}
+  .smallCode{display:block;color:#7291a8;font-size:.75em;margin-top:2px;}
+  .smallValue{margin-top:10px;font-size:clamp(26px,3vw,48px);line-height:1;font-weight:850;letter-spacing:-.03em;font-variant-numeric:tabular-nums;}
+  .smallValue .unit{font-size:.48em;margin-left:4px;color:#d5e4ee;}
+  #pengValue{color:#ffba4a;} #pgenValue{color:#eef7ff;} #psysValue{color:#1ee7f2;} #accValue{color:#f4f7fb;}
+  @media(max-width:850px){.tdash{grid-template-columns:30% 1fr;gap:7px}.tleft,.tright,.statusRow,.tprimary,.secondaryGrid{gap:7px}.tpanel{border-radius:8px}.metricMain{padding:14px}.smallMetric{padding:10px}.statusCard{padding:10px 12px}.modeStrip{display:none}}
+
 </style>
 </head>
 <body>
@@ -84,36 +131,69 @@
 </div>
 
 <div id="app">
+  <!-- GPXありの従来Replay -->
   <div class="tile" id="s2"><div class="map" id="map2"></div><div class="tag">ナビ</div><div class="hud" id="hud2"></div></div>
   <div class="tile" id="s1"><div class="map" id="map1"></div><div class="tag">俯瞰</div><div class="hud" id="hud1"></div>
     <div class="mlegend"><i style="color:#00e5ff">■</i>EV <i style="color:#4a9eff">■</i>SERIES <i style="color:#ff9a44">■</i>DIRECT<br><span style="color:#7a95ad">線の太さ = 車速（太いほど速い）</span></div>
   </div>
-  <div class="tile" id="s3">
-    <div class="tag">パワーフロー</div>
-    <svg id="flowSvg" viewBox="0 0 380 600" preserveAspectRatio="xMidYMid meet"></svg>
+  <div class="tile" id="s3"><div class="tag">パワーフロー</div><svg id="flowSvg" viewBox="0 0 380 600" preserveAspectRatio="xMidYMid meet"></svg></div>
+
+  <!-- GPXなし: 将来の実車インパネを想定したテレメトリUI -->
+  <div id="dashOnly">
+    <div class="tdash">
+      <section class="tleft">
+        <div class="tpanel tgaugeCard">
+          <div class="tgaugeTitle">速度<small>km/h</small></div>
+          <div class="tgauge" id="speedGauge"><div class="tgaugeCenter"><div class="tgaugeValue" id="speedValue">0</div><div class="tgaugeUnit">km/h</div></div></div>
+        </div>
+        <div class="tpanel tgaugeCard">
+          <div class="tgaugeTitle">回転数<small>rpm</small></div>
+          <div class="tgauge" id="rpmGauge"><div class="tgaugeCenter"><div class="tgaugeValue" id="rpmValue">0</div><div class="tgaugeUnit">rpm</div></div></div>
+        </div>
+      </section>
+      <section class="tright">
+        <div class="statusRow">
+          <div class="tpanel statusCard">
+            <div><div class="teye">走行モード</div><div class="tstatusValue" id="modeValue">EV</div></div>
+            <div class="modeStrip"><span id="modeEV">EV</span><span id="modeSERIES">SERIES</span><span id="modeDIRECT">DIRECT</span><span id="modeTRANS">TRANS</span></div>
+          </div>
+          <div class="tpanel statusCard" id="energyCard">
+            <div><div class="teye">エネルギー状態</div><div class="tstatusValue" id="energyValue">DRIVE</div></div>
+          </div>
+        </div>
+        <div class="tprimary">
+          <div class="tpanel metricMain">
+            <div class="metricHead"><span>バッテリー残量</span><span class="metricCode">SOC</span></div>
+            <div class="metricValue"><span id="socValue">--</span><span class="unit">%</span></div>
+            <div class="segbar" id="socBar"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+          </div>
+          <div class="tpanel metricMain">
+            <div class="metricHead"><span>バッテリー出力</span><span class="metricCode">Pbat</span></div>
+            <div class="metricValue drive" id="pbatValue">--<span class="unit">kW</span></div>
+            <div class="segbar pbar" id="pbatBar"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+            <div class="powerScale"><span>充電</span><span>0</span><span>放電</span></div>
+          </div>
+        </div>
+        <div class="secondaryGrid">
+          <div class="tpanel smallMetric"><div class="smallTitle">エンジン出力<span class="smallCode">Peng</span></div><div class="smallValue" id="pengValue">--<span class="unit">kW</span></div></div>
+          <div class="tpanel smallMetric"><div class="smallTitle">発電量<span class="smallCode">Pgen</span></div><div class="smallValue" id="pgenValue">--<span class="unit">kW</span></div></div>
+          <div class="tpanel smallMetric"><div class="smallTitle">システム出力<span class="smallCode">Psys</span></div><div class="smallValue" id="psysValue">--<span class="unit">kW</span></div></div>
+          <div class="tpanel smallMetric"><div class="smallTitle">ACC電圧<span class="smallCode">12V系</span></div><div class="smallValue" id="accValue">--<span class="unit">V</span></div></div>
+        </div>
+      </section>
+    </div>
   </div>
+
   <div id="ctrl">
     <button id="playBtn">▶</button>
-    <span class="spd" id="back5">« 5s</span>
-    <span class="spd" id="fwd10">10s »</span>
+    <span class="spd" id="back5">« 5s</span><span class="spd" id="fwd10">10s »</span>
     <input type="range" id="seek" min="0" max="1000" value="0">
-    <span class="spd on" data-s="1">1x</span>
-    <span class="spd" data-s="2">2x</span>
-    <span class="spd" data-s="5">5x</span>
-    <span class="spd" data-s="10">10x</span>
-    <span class="spd" id="engBtn">📊 サマリー</span>
-    <span class="spd" id="graphBtn">📈 グラフ</span>
-    <span id="tlabel">--:-- / --:--</span>
+    <span class="spd on" data-s="1">1x</span><span class="spd" data-s="2">2x</span><span class="spd" data-s="5">5x</span><span class="spd" data-s="10">10x</span>
+    <span class="spd" id="engBtn">📊 サマリー</span><span class="spd" id="graphBtn">📈 グラフ</span><span id="tlabel">--:-- / --:--</span>
   </div>
   <div id="graphPanel"><div id="graphCard"><svg id="graphSvg" viewBox="0 0 600 498" preserveAspectRatio="xMidYMid meet"></svg></div></div>
-  <div id="energyPanel"><div id="sumCard">
-    <div id="sumTitle">走行サマリー</div>
-    <div id="sumMetrics"></div>
-    <svg id="energySvg" viewBox="0 0 300 262" preserveAspectRatio="xMidYMid meet"></svg>
-    <div id="modeSection"><div class="mlabel">走行中のモード配分（上:時間 / 下:距離）</div><svg id="modeSvg" viewBox="0 0 300 122" preserveAspectRatio="xMidYMid meet"></svg></div>
-  </div></div>
+  <div id="energyPanel"><div id="sumCard"><div id="sumTitle">走行サマリー</div><div id="sumMetrics"></div><svg id="energySvg" viewBox="0 0 300 262" preserveAspectRatio="xMidYMid meet"></svg><div id="modeSection"><div class="mlabel">走行中のモード配分（上:時間 / 下:距離）</div><svg id="modeSvg" viewBox="0 0 300 122" preserveAspectRatio="xMidYMid meet"></svg></div></div></div>
 </div>
-
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="lib/flow.js"></script>
 <script type="module">
@@ -260,6 +340,37 @@ function fmtT(ms){ const s=Math.max(0,(ms-T0)/1000); const m=Math.floor(s/60); r
 let TZ='';
 function fmtAbs(ms){ const d=new Date(ms);
   return d.toLocaleDateString('sv-SE')+' '+d.toLocaleTimeString('ja-JP',{hour12:false})+(TZ?' '+TZ:''); }
+
+function fmt1(v){return Number.isFinite(v)?v.toFixed(1):'--';}
+function setSegments(id,ratio){
+  const a=document.querySelectorAll('#'+id+' i'), n=Math.max(0,Math.min(a.length,Math.round((Number.isFinite(ratio)?ratio:0)*a.length)));
+  a.forEach((x,i)=>x.classList.toggle('on',i<n));
+}
+function updateTelemetryDash(o,mR){
+  if(hasGps) return;
+  const mode=(mR===20?'EV':mR===40?'SERIES':(mR===50||mR===70)?'DIRECT':'TRANS');
+  document.getElementById('modeValue').textContent=mode;
+  for(const k of ['EV','SERIES','DIRECT','TRANS']) document.getElementById('mode'+k).classList.toggle('active',k===mode);
+  const recharge=Number.isFinite(o.pdrive)&&o.pdrive<-0.3; // 回生(車輪→駆動系)をRECHARGEとする。発電充電とは分離。
+  document.getElementById('energyValue').textContent=recharge?'RECHARGE':'DRIVE';
+  document.getElementById('energyCard').classList.toggle('recharge',recharge);
+  document.getElementById('speedValue').textContent=Math.round(o.vsp||0);
+  document.getElementById('rpmValue').textContent=Math.round(o.rpm||0);
+  document.getElementById('speedGauge').style.setProperty('--arc',(Math.max(0,Math.min(200,o.vsp||0))/200*75)+'%');
+  document.getElementById('rpmGauge').style.setProperty('--arc',(Math.max(0,Math.min(8000,o.rpm||0))/8000*75)+'%');
+  const soc=Number.isFinite(o.soc)?o.soc:NaN;
+  document.getElementById('socValue').textContent=Number.isFinite(soc)?soc.toFixed(1):'--';
+  setSegments('socBar',Number.isFinite(soc)?soc/100:0);
+  const pv=document.getElementById('pbatValue');
+  pv.innerHTML=(Number.isFinite(o.pbat)?((o.pbat>0?'+':'')+o.pbat.toFixed(1)):'--')+'<span class="unit">kW</span>';
+  pv.classList.toggle('recharge',recharge);pv.classList.toggle('drive',!recharge);
+  setSegments('pbatBar',Math.min(1,Math.abs(o.pbat||0)/60));
+  document.getElementById('pengValue').innerHTML=fmt1(o.peng)+'<span class="unit">kW</span>';
+  document.getElementById('pgenValue').innerHTML=fmt1(o.pgen)+'<span class="unit">kW</span>';
+  document.getElementById('psysValue').innerHTML=fmt1(o.psys)+'<span class="unit">kW</span>';
+  document.getElementById('accValue').innerHTML=fmt1(o.v12)+'<span class="unit">V</span>';
+}
+
 function render(t){
   if(hasGps){
     const pos=gpsAt(t);
@@ -279,13 +390,16 @@ function render(t){
   const o=obdAt(t);
   if(o){
     const mR=o.modeR??o.mode;
+    updateTelemetryDash(o,mR);
     D.rawMode=o.mode;   // トポロジとラベルは生モードで決める(遷移中はTRANS表示)
     D.runMode=mR; D.dispMode=mR; D.peng=o.peng; D.pgen=o.pgen; D.pbat=o.pbat;
     D.pdrive=o.pdrive; D.engRot=o.rpm; D.vsp=o.vsp; D.soc=(o.soc==null?NaN:o.soc);
-    drawFlow();
-    const hud=`${(MODE_LABELS[mR]||mR)}  ${o.vsp}km/h  ${Math.round(o.rpm)}rpm\nPsys ${o.psys.toFixed(1)}  Pbat ${o.pbat.toFixed(1)}kW`;
-    document.getElementById('hud1').textContent=hud;
-    document.getElementById('hud2').textContent=hud;
+    if(hasGps){
+      drawFlow();
+      const hud=`${(MODE_LABELS[mR]||mR)}  ${o.vsp}km/h  ${Math.round(o.rpm)}rpm\nPsys ${o.psys.toFixed(1)}  Pbat ${o.pbat.toFixed(1)}kW`;
+      document.getElementById('hud1').textContent=hud;
+      document.getElementById('hud2').textContent=hud;
+    }
   }
   document.getElementById('tlabel').textContent=fmtAbs(t)+'  '+fmtT(t)+'/'+fmtT(T1);
   if(graphOpen) drawGraph();   // グラフは常にPT中心で再描画(赤線=中央固定、再生でスクロール)
