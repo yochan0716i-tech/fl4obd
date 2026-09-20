@@ -360,7 +360,7 @@ import { CAL, decode2920, powers } from './lib/did2920.js';
  * 画面右上と保存ログの App: 行で確かめる。取得したログがどの版のものかも
  * これで後から特定できる。
  */
-const APP_VER = 'v20260920b';
+const APP_VER = 'v20260920c';
 
 // ─── Log ─────────────────────────────────────────────────
 let logBuffer = [];
@@ -1319,11 +1319,6 @@ async function initElm() {
     ['ATL0',            300],
     ['ATS0',            300],
     ['ATSP0',           500],
-    // TA=0x07 (パワトレECU) を固定ヘッダーに設定。全取得(222920/015B/0142)を0x07から行う
-    ['ATSH18DAF107',    300],
-    ['ATFCSH18DAF107',  200],
-    ['ATFCSD300000',    200],
-    ['ATFCSM1',         200],
   ];
   // 初期化専用: 内容にかかわらず '>' まで待ち、前の要求を完了させる。
   async function initCommand(command, timeout) {
@@ -1345,7 +1340,7 @@ async function initElm() {
     await new Promise(r => setTimeout(r, d));
   }
 
-  // ATSP0 後は自動探索があるため、各回最大10秒待つ（最大3回）。
+  // ATSP0 後は自動探索があるため、各回最大20秒待つ（最大3回）。
   // '>' 未受信のタイムアウトは中止し、探索中に次の要求を送らない。
   for (let attempt = 0; attempt < 3; attempt++) {
     let block;
