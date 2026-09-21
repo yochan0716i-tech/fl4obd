@@ -72,7 +72,7 @@
   #app.obd-only #dashOnly{display:grid;}
   .tdash{height:100%;min-height:0;display:grid;grid-template-columns:minmax(250px,31%) 1fr;gap:10px;}
   .tleft{display:grid;grid-template-rows:1fr 1fr;gap:10px;min-height:0;}
-  .tright{display:grid;grid-template-rows:auto minmax(0,1fr) auto;gap:10px;min-height:0;}
+  .tright{display:grid;grid-template-rows:auto minmax(0,.78fr) auto auto;gap:10px;min-height:0;}
   .tpanel{position:relative;min-width:0;min-height:0;overflow:hidden;border:1px solid #29445c;border-radius:12px;background:linear-gradient(145deg,#0d1f2d,#07121c);box-shadow:inset 0 0 24px #0003;}
   .tgaugeCard{display:grid;place-items:center;padding:16px;}
   .tgaugeTitle{position:absolute;top:14px;left:16px;font-size:clamp(16px,1.5vw,24px);font-weight:800;letter-spacing:.05em;color:#edf6ff;z-index:2;}
@@ -91,17 +91,38 @@
   #energyCard.recharge{border-color:#43f0a3;box-shadow:0 0 0 1px #43f0a32a,0 0 22px #43f0a334,inset 0 0 28px #43f0a30b;}
   #energyCard.recharge #energyValue{color:#43f0a3;text-shadow:0 0 15px #43f0a34d;}
   .tprimary{display:grid;grid-template-columns:1fr 1.08fr;gap:10px;min-height:0;}
-  .metricMain{padding:20px 22px;display:flex;flex-direction:column;justify-content:center;}
+  .metricMain{padding:14px 20px;display:flex;flex-direction:column;justify-content:center;}
   .metricHead{display:flex;align-items:baseline;gap:9px;color:#bfd3e1;font-size:clamp(15px,1.25vw,20px);font-weight:800;}
   .metricCode{color:#7291a8;font-size:.72em;font-weight:600;}
-  .metricValue{margin-top:10px;font-size:clamp(48px,6vw,92px);line-height:.95;font-weight:900;letter-spacing:-.05em;font-variant-numeric:tabular-nums;}
+  .metricValue{margin-top:7px;font-size:clamp(40px,5.1vw,76px);line-height:.95;font-weight:900;letter-spacing:-.05em;font-variant-numeric:tabular-nums;}
   .metricValue .unit{font-size:.44em;margin-left:6px;color:#e0edf6;letter-spacing:0;}
   #pbatValue.drive{color:#1ee7f2;} #pbatValue.recharge{color:#43f0a3;}
-  .segbar{margin-top:20px;height:15px;display:grid;gap:3px;grid-template-columns:repeat(12,1fr);}
+  .segbar{margin-top:13px;height:12px;display:grid;gap:3px;grid-template-columns:repeat(12,1fr);}
   .segbar i{display:block;border-radius:2px;background:#173247;transform:skewX(-12deg);}
   .segbar i.on{background:linear-gradient(90deg,#18dbe6,#2affc8);box-shadow:0 0 8px #27ead433;}
   .pbar{grid-template-columns:repeat(16,1fr);}
   .powerScale{margin-top:10px;display:flex;justify-content:space-between;color:#7894aa;font-size:clamp(10px,.8vw,13px);}
+  .monitorGrid{display:grid;grid-template-columns:1fr 1fr 1.4fr;gap:10px;}
+  .monitorMetric{min-height:88px;padding:11px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;}
+  .monitorLabel{color:#a9c1d2;font-size:clamp(12px,.95vw,16px);font-weight:800;letter-spacing:.02em;}
+  .monitorCode{display:block;color:#6f8ca2;font-size:.72em;font-weight:600;margin-top:2px;}
+  .monitorValue{font-size:clamp(24px,2.6vw,42px);font-weight:900;font-variant-numeric:tabular-nums;white-space:nowrap;}
+  .monitorValue .unit{font-size:.48em;margin-left:4px;color:#d5e4ee;}
+  #coolantValue{color:#7fd0ff;}
+  #battTempValue{color:#d7e8f4;}
+  .warningCard{transition:border-color .15s,background .15s,box-shadow .15s;}
+  .warningState{display:flex;align-items:center;gap:9px;font-size:clamp(17px,1.65vw,28px);font-weight:900;letter-spacing:.035em;text-align:right;}
+  .warningIcon{display:none;font-size:1.2em;}
+  .warningList{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .warningCard.normal .warningState{color:#6f9b89;}
+  .warningCard.alert{border-color:#ff554d;background:linear-gradient(145deg,#351317,#180b10);box-shadow:0 0 0 1px #ff554d55,0 0 26px #ff443344,inset 0 0 28px #ff443315;}
+  .warningCard.alert .warningState{color:#ff6a62;text-shadow:0 0 12px #ff443366;}
+  .warningCard.alert .warningIcon{display:inline;}
+  .warningCard.new-alert{animation:warningFlash .55s step-end 7;}
+  @keyframes warningFlash{
+    0%,100%{background:linear-gradient(145deg,#351317,#180b10);box-shadow:0 0 0 1px #ff554d55,0 0 26px #ff443344,inset 0 0 28px #ff443315;}
+    50%{background:#7b1017;box-shadow:0 0 0 2px #ff8b83,0 0 42px #ff3b30aa,inset 0 0 34px #ffb0aa22;}
+  }
   .secondaryGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
   .smallMetric{min-height:112px;padding:14px 16px;display:flex;flex-direction:column;justify-content:center;}
   .smallTitle{color:#bfd3e1;font-size:clamp(12px,1vw,17px);font-weight:800;}
@@ -109,7 +130,7 @@
   .smallValue{margin-top:10px;font-size:clamp(26px,3vw,48px);line-height:1;font-weight:850;letter-spacing:-.03em;font-variant-numeric:tabular-nums;}
   .smallValue .unit{font-size:.48em;margin-left:4px;color:#d5e4ee;}
   #pengValue{color:#ffba4a;} #pgenValue{color:#eef7ff;} #psysValue{color:#1ee7f2;} #accValue{color:#f4f7fb;}
-  @media(max-width:850px){.tdash{grid-template-columns:30% 1fr;gap:7px}.tleft,.tright,.statusRow,.tprimary,.secondaryGrid{gap:7px}.tpanel{border-radius:8px}.metricMain{padding:14px}.smallMetric{padding:10px}.statusCard{padding:10px 12px}.modeStrip{display:none}}
+  @media(max-width:850px){.tdash{grid-template-columns:30% 1fr;gap:7px}.tleft,.tright,.statusRow,.tprimary,.monitorGrid,.secondaryGrid{gap:7px}.tpanel{border-radius:8px}.metricMain{padding:14px}.smallMetric{padding:10px}.statusCard{padding:10px 12px}.modeStrip{display:none}}
 
 </style>
 </head>
@@ -172,6 +193,20 @@
             <div class="metricValue drive" id="pbatValue">--<span class="unit">kW</span></div>
             <div class="segbar pbar" id="pbatBar"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
             <div class="powerScale"><span>充電</span><span>0</span><span>放電</span></div>
+          </div>
+        </div>
+        <div class="monitorGrid">
+          <div class="tpanel monitorMetric">
+            <div><div class="monitorLabel">水温</div><span class="monitorCode">Coolant</span></div>
+            <div class="monitorValue" id="coolantValue">--<span class="unit">°C</span></div>
+          </div>
+          <div class="tpanel monitorMetric">
+            <div><div class="monitorLabel">バッテリー温度</div><span class="monitorCode">Batt Temp · 未解析</span></div>
+            <div class="monitorValue" id="battTempValue">--<span class="unit">°C</span></div>
+          </div>
+          <div class="tpanel monitorMetric warningCard normal" id="warningCard">
+            <div><div class="monitorLabel">警告</div><span class="monitorCode">Warning status</span></div>
+            <div class="warningState"><span class="warningIcon">⚠</span><span class="warningList" id="warningList">NORMAL</span></div>
           </div>
         </div>
         <div class="secondaryGrid">
@@ -237,12 +272,12 @@ function parseFrames(text){
     if(tm){ const tod=(+tm[1])*3600000+(+tm[2])*60000+(+tm[3])*1000+(+tm[4]);
       if(prevTod>=0 && tod<prevTod-1000) dayOff+=86400000; prevTod=tod; t=dayMs+tod+dayOff; }
     const f=decode2920(hex); if(!f) continue;          // フィールド定義は lib/did2920.js
-    const {mode,rpm,vsp,pbat,v12}=f;
+    const {mode,rpm,vsp,pbat,v12,coolant}=f;
     const {peng,pgen,pdrive,psys}=powers(f);
     // ∫Pbat で socR を前進(前フレームからの経過で積分, 異常gapは無視)
     if(!isNaN(socR) && prevT!=null){ const dt=(t-prevT)/3600000; if(dt>0&&dt<0.02) socR+=CAL.SOC_K*pbat*dt; }
     prevT=t;
-    out.push({t,mode,rpm,vsp,peng,pgen,pdrive,pbat,v12,soc:isNaN(socR)?lastSoc:+socR.toFixed(2),psys});
+    out.push({t,mode,rpm,vsp,peng,pgen,pdrive,pbat,v12,coolant,soc:isNaN(socR)?lastSoc:+socR.toFixed(2),psys});
   }
   out.sort((a,b)=>a.t-b.t); return out;
 }
@@ -346,6 +381,35 @@ function setSegments(id,ratio){
   const a=document.querySelectorAll('#'+id+' i'), n=Math.max(0,Math.min(a.length,Math.round((Number.isFinite(ratio)?ratio:0)*a.length)));
   a.forEach((x,i)=>x.classList.toggle('on',i<n));
 }
+let warningSignature='', warningFlashTimer=null;
+/*
+ * 警告は将来のECU解析用。
+ * 例: updateWarnings(['BRAKE','VSA','HYBRID'])
+ * 新しい警告集合へ変化した瞬間だけ約4秒点滅し、その後は赤常灯。
+ */
+function updateWarnings(list){
+  const warnings=[...new Set((list||[]).filter(Boolean))];
+  const card=document.getElementById('warningCard'), label=document.getElementById('warningList');
+  if(!card||!label) return;
+  const sig=warnings.join('|');
+  const active=warnings.length>0;
+  label.textContent=active?warnings.join(' / '):'NORMAL';
+  card.classList.toggle('alert',active);
+  card.classList.toggle('normal',!active);
+  if(active && sig!==warningSignature){
+    card.classList.remove('new-alert');
+    void card.offsetWidth;
+    card.classList.add('new-alert');
+    clearTimeout(warningFlashTimer);
+    warningFlashTimer=setTimeout(()=>card.classList.remove('new-alert'),4000);
+  }else if(!active){
+    card.classList.remove('new-alert');
+    clearTimeout(warningFlashTimer);
+  }
+  warningSignature=sig;
+}
+window.setReplayWarnings=updateWarnings;
+
 function updateTelemetryDash(o,mR){
   if(hasGps) return;
   const mode=(mR===20?'EV':mR===40?'SERIES':(mR===50||mR===70)?'DIRECT':'TRANS');
@@ -369,6 +433,10 @@ function updateTelemetryDash(o,mR){
   document.getElementById('pgenValue').innerHTML=fmt1(o.pgen)+'<span class="unit">kW</span>';
   document.getElementById('psysValue').innerHTML=fmt1(o.psys)+'<span class="unit">kW</span>';
   document.getElementById('accValue').innerHTML=fmt1(o.v12)+'<span class="unit">V</span>';
+  document.getElementById('coolantValue').innerHTML=fmt1(o.coolant)+'<span class="unit">°C</span>';
+  // Batt Temp / 警告フラグは未解析。信号取得後にここへ接続する。
+  document.getElementById('battTempValue').innerHTML='--<span class="unit">°C</span>';
+  updateWarnings([]);
 }
 
 function render(t){
